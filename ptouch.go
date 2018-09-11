@@ -1,11 +1,10 @@
-package main
+package ptouchgo
 
 import (
 	"bytes"
 	"fmt"
 	"image/png"
-	"log"
-	"os"
+	"io"
 
 	"github.com/goburrow/serial"
 )
@@ -93,25 +92,145 @@ func (s BatteryStatusType) String() string {
 	return fmt.Sprintf("Battery: %#x", s)
 }
 
-func main() {
-	// prepare data
+type Serial struct {
+	Conn        io.ReadWriteCloser
+	TapeWidthMM uint
+}
 
-	imgFile, err := os.Open("./out.png")
-	if err != nil {
-		panic(err)
+func Open(address string, TapeWidthMM uint) (Serial, error) {
+	ser, err := serial.Open(&serial.Config{
+		Address:  address,
+		BaudRate: 115200,
+		StopBits: 1,
+		Parity:   "N",
+	})
+	return Serial{Conn: ser, TapeWidthMM: TapeWidthMM}, err
+}
+
+func (s Serial) Initialize() error {
+	_, err := s.Conn.Write(cmdInitialize)
+	return err
+}
+
+func (s Serial) Flush() {
+	// Flush print buffer
+	for i := 0; i < 64; i++ {
+		s.Conn.Write([]byte{0x00})
 	}
-	defer imgFile.Close()
+}
 
-	originalPNG, err := png.Decode(imgFile)
+func (s Serial) DumpStatus() (*Status, error) {
+	_, err := s.Conn.Write(cmdDumpStatus)
 	if err != nil {
-		panic(err)
+		return nil, err
+	}
+
+	buf := make([]byte, 32)
+	s.Conn.Read(buf)
+	return parseStatus(buf)
+}
+
+func (s Serial) SetPTCBPMode() {
+	s.Conn.Write(cmdSetPTCBPMode)
+}
+
+func (s Serial) Close() error {
+	return s.Conn.Close()
+}
+
+func (s Serial) SetTapeProperty(rasterLines int) error {
+	_, err := s.Conn.Write([]byte{
+		// Start set media quarity
+		0x1b, 0x69, 0x7a,
+		// #1: Print quality 0=fast, 1=high
+		0xc4,
+		// #2: Media type: 0=roll, 1=pre-cut labels
+		0x01,
+		// #3: Tape width in mm
+		byte(s.TapeWidthMM),
+		// #4: Label height in mm (0 for roll)
+		0x00,
+		// #5, #6 Page consists of N = #5 + 256 * #6 pixel lines
+		byte(uint(rasterLines % 256)),
+		byte(uint(rasterLines / 256)),
+		// Unused data bytes
+		0x00, 0x00, 0x00, 0x00,
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = s.Conn.Write([]byte{
+		// # Set no mirror, no auto tape cut
+		0x1b, 0x69, 0x4d,
+		0x00,
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = s.Conn.Write([]byte{
+		// # Set print chaining off (0x8) or on (0x0)
+		0x1b, 0x69, 0x4b,
+		0x08,
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = s.Conn.Write([]byte{
+		// # Set margin amount (feed amount)
+		0x1b, 0x69, 0x64,
+		0x00, 0x00,
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = s.Conn.Write([]byte{
+		// Set compression mode: TIFF
+		0x4d, 0x02,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s Serial) SendImage(tiffdata []byte) error {
+	// 128px @ 1bpp = 16 bytes
+	_, err := s.Conn.Write(tiffdata)
+	if err != nil {
+		return err
+	}
+
+	// Print and feed
+	_, err = s.Conn.Write([]byte{
+		0x1a,
+	})
+	return err
+}
+
+func (s Serial) Reset() error {
+	return s.Initialize()
+}
+
+func LoadRawImage(r io.Reader) ([]byte, int, error) {
+	originalPNG, err := png.Decode(r)
+	if err != nil {
+		return nil, 0, err
 	}
 	size := originalPNG.Bounds().Size()
+	if size.X != 128 {
+		return nil, 0, fmt.Errorf("image size must have 128px width, got: %d", size.X)
+	}
 
 	bytesWidth := size.X / 8
 	if size.X%8 != 0 {
 		bytesWidth++
 	}
+
 	data := make([]byte, bytesWidth*size.Y)
 
 	for y := 0; y < size.Y; y++ {
@@ -124,146 +243,36 @@ func main() {
 		}
 	}
 
-	rasterLines := len(data) / bytesWidth
-	chunkSize := bytesWidth
+	return data, bytesWidth, nil
+}
 
-	// Compless data
-	dataBuf := bytes.NewBuffer(nil)
-	var n1 uint
-	var n2 uint
-	maxLen := len(data)
-	for i := 0; i < maxLen; i += chunkSize {
-		to := i + chunkSize
-		if to > maxLen {
-			to = maxLen
+func CompressImage(data []byte, bytesWidth int) ([]byte, error) {
+	var dataBuf bytes.Buffer
+	max := len(data)
+
+	for i := 0; i < max; i += bytesWidth {
+		to := i + bytesWidth
+		if to > max {
+			to = max
 		}
 		chunk := data[i:to]
-		fmt.Println(i, chunkSize, to)
 
 		packed, err := packBits(chunk)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 
 		length := len(packed)
-		fmt.Println(chunk)
-		fmt.Println(packed)
-		fmt.Println(length)
-
-		n1 = uint(length % 256)
-		n2 = uint(length / 256)
 
 		dataBuf.Write(cmdTransfer)
-		dataBuf.Write([]byte{byte(n1), byte(n2)})
+		dataBuf.Write([]byte{
+			byte(uint(length % 256)),
+			byte(uint(length / 256)),
+		})
 		dataBuf.Write(packed)
 	}
 
-	// os.Exit(0)
-
-	// Open printer
-	ser, err := serial.Open(&serial.Config{
-		Address:  "/dev/rfcomm0",
-		BaudRate: 115200,
-		StopBits: 1,
-		Parity:   "N",
-	})
-
-	if err != nil {
-		panic(err)
-	}
-	defer ser.Close()
-
-	ser.Write(cmdInitialize)
-	ser.Write(cmdDumpStatus)
-
-	// Flush print buffer
-	for i := 0; i < 64; i++ {
-		ser.Write([]byte{0x00})
-	}
-
-	// Raster graphics(PTCBP) mode
-	ser.Write(cmdSetPTCBPMode)
-
-	buf := make([]byte, 32)
-	ser.Read(buf)
-	st, err := parseStatus(buf)
-	if err != nil {
-		panic(err)
-	}
-	if st != nil {
-		log.Println(st)
-	}
-
-	tapeWidthInMM := 24
-
-	// Set property
-	fmt.Println("Set property")
-	ser.Write([]byte{
-		// Start set media quarity
-		0x1b, 0x69, 0x7a,
-		// #1: Print quality 0=fast, 1=high
-		0xc4,
-		// #2: Media type: 0=roll, 1=pre-cut labels
-		0x01,
-		// #3: Tape width in mm
-		byte(tapeWidthInMM),
-		// #4: Label height in mm (0 for roll)
-		0x00,
-		// #5, #6 Page consists of N = #5 + 256 * #6 pixel lines
-		byte(uint(rasterLines % 256)),
-		byte(uint(rasterLines / 256)),
-		// Unused data bytes
-		0x00, 0x00, 0x00, 0x00,
-	})
-
-	ser.Write([]byte{
-		// # Set print chaining off (0x8) or on (0x0)
-		0x1b, 0x69, 0x4b,
-		0x08,
-	})
-
-	ser.Write([]byte{
-		// # Set no mirror, no auto tape cut
-		0x1b, 0x69, 0x4d,
-		0x00,
-	})
-
-	ser.Write([]byte{
-		// # Set margin amount (feed amount)
-		0x1b, 0x69, 0x64,
-		0x00, 0x00,
-	})
-
-	ser.Write([]byte{
-		// Set compression mode: TIFF
-		0x4d, 0x02,
-	})
-
-	// Transfer data
-	// 128px @ 1bpp = 16 bytes
-
-	ser.Write(dataBuf.Bytes())
-
-	// Print and feed
-	fmt.Println("Print")
-	ser.Write([]byte{
-		0x1a,
-	})
-
-	// Dump status
-	fmt.Println("Dump status")
-	buf = make([]byte, 32)
-	ser.Read(buf)
-	st, err = parseStatus(buf)
-	if err != nil {
-		panic(err)
-	}
-	if st != nil {
-		log.Println(st)
-	}
-
-	// Re initialize
-	ser.Write(cmdInitialize)
+	return dataBuf.Bytes(), nil
 }
 
 func parseStatus(in []byte) (*Status, error) {
@@ -278,69 +287,4 @@ func parseStatus(in []byte) (*Status, error) {
 		ErrorCode2:    int(in[statusOffsetErrorInfo2]),
 		ExtendedError: int(in[statusOffsetExtendedError]),
 	}, nil
-}
-
-
-func packBits(input []byte) ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0, 128))
-	dst := make([]byte, 0, 1024)
-
-	var rle bool
-	var repeats int
-	const maxRepeats = 127
-
-	var finishRaw = func() {
-		if buf.Len() == 0 {
-			return
-		}
-		dst = append(dst, byte(buf.Len()-1))
-		dst = append(dst, buf.Bytes()...)
-		buf.Reset()
-	}
-
-	var finishRle = func(b byte, repeats int) {
-		dst = append(dst, byte(256-(repeats-1)))
-		dst = append(dst, b)
-	}
-
-	for i, b := range input {
-		isLast := i == len(input)-1
-		if isLast {
-			if !rle {
-				buf.WriteByte(b)
-				finishRaw()
-			} else {
-				repeats++
-				finishRle(b, repeats)
-			}
-			break
-		}
-
-		if b == input[i+1] {
-			if !rle {
-				finishRaw()
-				rle = true
-				repeats = 1
-			} else {
-				if repeats == maxRepeats {
-					finishRle(b, repeats)
-					repeats = 0
-				}
-				repeats++
-			}
-		} else {
-			if !rle {
-				if buf.Len() == maxRepeats {
-					finishRaw()
-				}
-				buf.WriteByte(b)
-			} else {
-				repeats++
-				finishRle(b, repeats)
-				rle = false
-				repeats = 0
-			}
-		}
-	}
-	return dst, nil
 }
