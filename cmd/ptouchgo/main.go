@@ -12,9 +12,10 @@ import (
 
 var (
 	imagePath  = flag.String("i", "", "Image path")
-	rfcommPath = flag.String("d", "/dev/rfcomm0", "Device path(RFCOMM)")
+	devicePath = flag.String("d", "/dev/rfcomm0", "Device path(RFCOMM or \"usb\")")
 	tapeWidth  = flag.Uint("t", 24, "Tape width")
 	debugMode  = flag.Bool("debug", false, "Debug decoded image")
+	dryRunMode = flag.Bool("dry", false, "not printing")
 )
 
 var (
@@ -22,30 +23,38 @@ var (
 )
 
 func main() {
-	var err error
-	log.SetPrefix("ptouchgo")
+	log.SetPrefix("ptouchgo: ")
 	log.SetFlags(0)
-
 	flag.Parse()
-	if *imagePath == "" || *rfcommPath == "" {
-		log.Fatalln("image file path and rcomm device path required")
+
+	err := mainCLI()
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func mainCLI() error {
+
+	var err error
+	if *imagePath == "" || *devicePath == "" {
+		return fmt.Errorf("image file path and device path required")
 	}
 
 	tw := ptouchgo.TapeWidth(*tapeWidth)
 	if !tw.Valid() {
-		log.Fatalln("tapeWith only accespts 3.5,6,9,12,18,24")
+		return fmt.Errorf("tapeWith only accespts 3.5,6,9,12,18,24")
 	}
 
 	// prepare data
 	imgFile, err := os.Open(*imagePath)
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	defer imgFile.Close()
 
 	data, bytesWidth, err := ptouchgo.LoadRawImage(imgFile, tw)
 	if err != nil {
-		log.Fatalln(errors.Wrap(err, "load image"))
+		return errors.Wrap(err, "load image")
 	}
 	rasterLines := len(data) / bytesWidth
 
@@ -62,74 +71,75 @@ func main() {
 			}
 			fmt.Println()
 		}
-		os.Exit(0)
 	}
 
 	// Compless data
 	packedData, err := ptouchgo.CompressImage(data, bytesWidth)
 	if err != nil {
-		log.Fatalln(errors.Wrap(err, "convert image"))
+		return errors.Wrap(err, "convert image")
 	}
 
-	log.Println("Image loaded")
+	if debug {
+		log.Println("Image loaded")
+	}
 
 	// Open printer
-	ser, err = ptouchgo.Open(*rfcommPath, *tapeWidth)
+	ser, err = ptouchgo.Open(*devicePath, *tapeWidth, debug)
 	if err != nil {
-		log.Fatalln(errors.Wrap(err, *rfcommPath))
+		return errors.Wrap(err, *devicePath)
 	}
 	defer ser.Close()
 
 	err = ser.Reset()
 	if err != nil {
-		goto handleError
+		return err
 	}
 
 	err = ser.SetRasterMode()
 	if err != nil {
-		goto handleError
+		return err
 	}
 
 	// Set property
 	err = ser.SetPrintProperty(rasterLines)
 	if err != nil {
-		goto handleError
+		return err
 	}
 
 	err = ser.SetPrintMode(true, false)
 	if err != nil {
-		goto handleError
+		return err
 	}
 
 	err = ser.SetExtendedMode(false, true, false, false, false)
 	if err != nil {
-		goto handleError
+		return err
 	}
 
-	err = ser.SetFeedAmount(1)
+	err = ser.SetFeedAmount(10)
 	if err != nil {
-		goto handleError
+		return err
 	}
 
 	err = ser.SetCompressionModeEnabled(true)
 	if err != nil {
-		goto handleError
+		return err
 	}
 
-	err = ser.SendImage(packedData)
-	if err != nil {
-		goto handleError
+	if !*dryRunMode {
+		err = ser.SendImage(packedData)
+		if err != nil {
+			return err
+		}
 	}
 
-	err = ser.PrintAndEject()
-	if err != nil {
-		goto handleError
+	if !*dryRunMode {
+		err = ser.PrintAndEject()
+		if err != nil {
+			return err
+		}
 	}
 
 	ser.Reset()
-	return
-
-handleError:
-	ser.Close()
-	log.Fatalln(err)
+	return nil
 }

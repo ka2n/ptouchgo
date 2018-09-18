@@ -3,13 +3,14 @@ package ptouchgo
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"image"
 	"image/png"
 	"io"
+	"log"
 
 	"github.com/disintegration/imaging"
-	"github.com/goburrow/serial"
 )
 
 const (
@@ -232,16 +233,27 @@ const (
 type Serial struct {
 	Conn        io.ReadWriteCloser
 	TapeWidthMM uint
+	Debug       bool
 }
 
-func Open(address string, TapeWidthMM uint) (Serial, error) {
-	ser, err := serial.Open(&serial.Config{
-		Address:  address,
-		BaudRate: 115200,
-		StopBits: 1,
-		Parity:   "N",
-	})
-	return Serial{Conn: ser, TapeWidthMM: TapeWidthMM}, err
+func Open(address string, TapeWidthMM uint, debug bool) (Serial, error) {
+	var ser io.ReadWriteCloser
+	var err error
+	if address == "usb" {
+		if debug {
+			log.Println("Select USB driver")
+		}
+		ser, err = OpenUSB()
+	} else {
+		if debug {
+			log.Println("Select Bluetooth driver")
+		}
+		ser, err = OpenBluetooth(address)
+	}
+	if err != nil {
+		return Serial{}, err
+	}
+	return Serial{Conn: ser, TapeWidthMM: TapeWidthMM, Debug: debug}, err
 }
 
 // ClearBuffer clears current state
@@ -249,12 +261,18 @@ func Open(address string, TapeWidthMM uint) (Serial, error) {
 // send ClearBuffer() and Initialize() then printer buffer are cleared and return to data receiving state
 func (s Serial) ClearBuffer() error {
 	// send empty instruction
+	if s.Debug {
+		log.Println("ClearBuffer")
+	}
 	_, err := s.Conn.Write(make([]byte, 100))
 	return err
 }
 
 // Initialize clears mode setting
 func (s Serial) Initialize() error {
+	if s.Debug {
+		log.Println("Initialize", hex.EncodeToString(cmdInitialize))
+	}
 	_, err := s.Conn.Write(cmdInitialize)
 	return err
 }
@@ -262,6 +280,9 @@ func (s Serial) Initialize() error {
 // RequestStatus requests current status
 // do not use while printing
 func (s Serial) RequestStatus() error {
+	if s.Debug {
+		log.Println("RequestStatus", hex.EncodeToString(cmdDumpStatus))
+	}
 	_, err := s.Conn.Write(cmdDumpStatus)
 	return err
 }
@@ -274,6 +295,9 @@ func (s Serial) ReadStatus() (*Status, error) {
 }
 
 func (s Serial) SetRasterMode() error {
+	if s.Debug {
+		log.Println("SetRasterMode", hex.EncodeToString(cmdSetRasterMode))
+	}
 	_, err := s.Conn.Write(cmdSetRasterMode)
 	return err
 }
@@ -287,7 +311,13 @@ func (s Serial) SetNotificationMode(on bool) error {
 	} else {
 		b = 0x1
 	}
-	_, err := s.Conn.Write(append(cmdNotifyModePrefix, b))
+
+	payload := append(cmdNotifyModePrefix, b)
+	if s.Debug {
+		log.Println("SetNotificationMode", on, hex.EncodeToString(payload))
+	}
+
+	_, err := s.Conn.Write(payload)
 	return err
 }
 
@@ -298,11 +328,12 @@ func (s Serial) Close() error {
 func (s Serial) SetPrintProperty(rasterLines int) error {
 	var enableFlag int
 
+	enableFlag |= printPropertyEnableBitRecoverOnDevice
+
 	// Tape
 	tapeWidth := byte(s.TapeWidthMM)
 	const tapeLength = byte(0x00)
 	enableFlag |= printPropertyEnableBitWidth
-	enableFlag |= printPropertyEnableBitLength
 
 	// Data size
 	// N4*256*256*256 + N3*256*256 + N2*256 + N1
@@ -332,6 +363,10 @@ func (s Serial) SetPrintProperty(rasterLines int) error {
 		eeprom,
 	}...)
 
+	if s.Debug {
+		log.Println("SetPrintProperty", hex.EncodeToString(data))
+	}
+
 	_, err := s.Conn.Write(data)
 	return err
 }
@@ -345,7 +380,12 @@ func (s Serial) SetPrintMode(autocut, mirror bool) error {
 		v = setBit(v, 7)
 	}
 
-	_, err := s.Conn.Write(append(cmdSetPrintModePrefix, byte(v)))
+	payload := append(cmdSetPrintModePrefix, byte(v))
+	if s.Debug {
+		log.Println("SetPrintMode", hex.EncodeToString(payload))
+	}
+
+	_, err := s.Conn.Write(payload)
 	return err
 }
 
@@ -370,16 +410,27 @@ func (s Serial) SetExtendedMode(pt750halfcut bool, noChainprint bool, specialTap
 	if noClearBuffer {
 		v = setBit(v, 7)
 	}
-	_, err := s.Conn.Write(append(cmdSetExtendedModePrefix, byte(v)))
+
+	payload := append(cmdSetExtendedModePrefix, byte(v))
+	if s.Debug {
+		log.Println("SetExtendedMode", hex.EncodeToString(payload))
+	}
+
+	_, err := s.Conn.Write(payload)
 	return err
 }
 
 func (s Serial) SetFeedAmount(amount int) error {
 	n1 := byte(amount % 256)
 	n2 := byte(amount / 256)
-	_, err := s.Conn.Write(append(cmdSetFeedAmountPrefix, []byte{
+
+	payload := append(cmdSetFeedAmountPrefix, []byte{
 		n1, n2,
-	}...))
+	}...)
+	if s.Debug {
+		log.Println("SetFeedAmount", hex.EncodeToString(payload))
+	}
+	_, err := s.Conn.Write(payload)
 	return err
 }
 
@@ -387,7 +438,11 @@ func (s Serial) SetAutocutPerPagesForPTP750W(pages int) error {
 	if pages == 0 {
 		pages = 1
 	}
-	_, err := s.Conn.Write(append(cmdSetAutcutPrefix, byte(pages)))
+	payload := append(cmdSetAutcutPrefix, byte(pages))
+	if s.Debug {
+		log.Println("SetAutocutPerPagesForPTP750W", hex.EncodeToString(payload))
+	}
+	_, err := s.Conn.Write(payload)
 	return err
 }
 
@@ -396,21 +451,35 @@ func (s Serial) SetCompressionModeEnabled(enabled bool) error {
 	if enabled {
 		v = 0x02
 	}
-	_, err := s.Conn.Write(append(cmdSetCompressionModePrefix, v))
+
+	payload := append(cmdSetCompressionModePrefix, v)
+	if s.Debug {
+		log.Println("SetCompressionModeEnabled", hex.EncodeToString(payload))
+	}
+	_, err := s.Conn.Write(payload)
 	return err
 }
 
 func (s Serial) SendImage(tiffdata []byte) error {
+	if s.Debug {
+		log.Println("SendImage", len(tiffdata))
+	}
 	_, err := s.Conn.Write(tiffdata)
 	return err
 }
 
 func (s Serial) Print() error {
+	if s.Debug {
+		log.Printf("Print %08b", cmdPrint)
+	}
 	_, err := s.Conn.Write(cmdPrint)
 	return err
 }
 
 func (s Serial) PrintAndEject() error {
+	if s.Debug {
+		log.Printf("PrintAndEject %08b", cmdPrintAndEject)
+	}
 	_, err := s.Conn.Write(cmdPrintAndEject)
 	return err
 }
