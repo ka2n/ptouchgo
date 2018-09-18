@@ -492,20 +492,23 @@ func (s Serial) Reset() error {
 	return s.Initialize()
 }
 
-func LoadRawImage(r io.Reader, tapeWidth TapeWidth) ([]byte, int, error) {
-	originalPNG, err := png.Decode(r)
+func LoadPNGImage(r io.Reader, tapeWidth TapeWidth) ([]byte, int, error) {
+	p, err := png.Decode(r)
 	if err != nil {
 		return nil, 0, err
 	}
+	return LoadRawImage(p, tapeWidth)
+}
 
+func LoadRawImage(p image.Image, tapeWidth TapeWidth) ([]byte, int, error) {
 	ws := 128
-
 	var canvas image.Image
-	size := originalPNG.Bounds().Size()
+
+	size := p.Bounds().Size()
 	if size.X == ws {
-		canvas = imaging.FlipH(originalPNG)
+		canvas = imaging.FlipH(p)
 	} else if size.Y == ws {
-		canvas = imaging.Transpose(originalPNG)
+		canvas = imaging.Transpose(p)
 	} else {
 		return nil, 0, fmt.Errorf("image size must have %dpx width or height for %d tape, got: %dx%d", ws, tapeWidth, size.X, size.Y)
 	}

@@ -52,7 +52,7 @@ func mainCLI() error {
 	}
 	defer imgFile.Close()
 
-	data, bytesWidth, err := ptouchgo.LoadRawImage(imgFile, tw)
+	data, bytesWidth, err := ptouchgo.LoadPNGImage(imgFile, tw)
 	if err != nil {
 		return errors.Wrap(err, "load image")
 	}
