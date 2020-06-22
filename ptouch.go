@@ -1,4 +1,4 @@
-// Package ptouchgo is a driver for PT-710BT/PT750W
+// Package ptouchgo is a driver for PT-710BT/PT700/PT750W
 package ptouchgo
 
 import (
@@ -54,6 +54,7 @@ type Status struct {
 type Model int
 
 const (
+        modelPTP700   Model = 0x67 // PT-P700
 	modelPTP750W  Model = 0x68 // PT-P750W
 	modelPTP710BT Model = 0x76 // PT-P710BT
 )
