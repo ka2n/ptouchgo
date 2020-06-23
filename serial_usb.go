@@ -11,6 +11,7 @@ import (
 
 const (
 	brotherVendorID   = 0x04f9
+        productIDPTP700   = 0x2061
 	productIDPTP750W  = 0x2062
 	productIDPTP710BT = 0x20af
 )
@@ -40,8 +41,12 @@ func OpenUSB() (io.ReadWriteCloser, error) {
 
 	dev, _ = ctx.OpenDeviceWithVIDPID(brotherVendorID, productIDPTP750W)
 	if dev == nil {
-		dev, _ = ctx.OpenDeviceWithVIDPID(brotherVendorID, productIDPTP710BT)
+		dev, _ = ctx.OpenDeviceWithVIDPID(brotherVendorID, productIDPTP700)
 	}
+
+        if dev == nil {
+                dev, _ = ctx.OpenDeviceWithVIDPID(brotherVendorID, productIDPTP710BT)
+        }
 
 	if dev == nil {
 		err = fmt.Errorf("USB device not found")
