@@ -4,6 +4,17 @@ package ptouchgo
 
 import "strconv"
 
+func _() {
+	// An "invalid array index" compiler error signifies that the constant values have changed.
+	// Re-run the stringer command to generate them again.
+	var x [1]struct{}
+	_ = x[batteryFull-0]
+	_ = x[batteryHalf-1]
+	_ = x[batteryLow-2]
+	_ = x[batteryChangeBatteries-3]
+	_ = x[batteryAC-4]
+}
+
 const _BatteryStatusType_name = "FullHalfLowChangeBatteriesAC"
 
 var _BatteryStatusType_index = [...]uint8{0, 4, 8, 11, 26, 28}

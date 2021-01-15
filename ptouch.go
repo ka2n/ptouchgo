@@ -89,6 +89,7 @@ const (
 	tapeWidth12   TapeWidth = 12 // 12mm
 	tapeWidth18   TapeWidth = 18 // 18mm
 	tapeWidth24   TapeWidth = 24 // 24mm
+	tapeWidth62   TapeWidth = 62 // 62mm
 )
 
 //go:generate stringer -linecomment -type MediaType
@@ -217,7 +218,7 @@ var (
 	cmdSetExtendedModePrefix    = []byte{0x1b, 0x69, 0x4b}
 	cmdSetFeedAmountPrefix      = []byte{0x1b, 0x69, 0x64}
 	cmdSetCompressionModePrefix = []byte{0x4d}
-	cmdRasterTransfer           = []byte{0x47}
+	cmdRasterTransfer           = []byte{0x77}
 	cmdRasterZeroline           = []byte{0x5a}
 	cmdPrint                    = []byte{0x0c}
 	cmdPrintAndEject            = []byte{0x1a}
@@ -329,12 +330,22 @@ func (s Serial) Close() error {
 func (s Serial) SetPrintProperty(rasterLines int) error {
 	var enableFlag int
 
+	// 成功時: 1b697a860a3e00d00200000000
+	// ON: 0x02, 0x04, 0x80
+	// enableFlag |= 0x02
+	// enableFlag |= 0x04
+	// enableFlag |= 0x08
+	// enableFlag |= 0x40
+	// enableFlag |= 0x80
+
 	enableFlag |= printPropertyEnableBitRecoverOnDevice
 
 	// Tape
-	tapeWidth := byte(s.TapeWidthMM)
-	const tapeLength = byte(0x00)
+	tapeWidth := byte(uint(62))
 	enableFlag |= printPropertyEnableBitWidth
+
+	tapeLength := byte(uint(0))
+	enableFlag |= printPropertyEnableBitLength
 
 	// Data size
 	// N4*256*256*256 + N3*256*256 + N2*256 + N1
@@ -345,7 +356,8 @@ func (s Serial) SetPrintProperty(rasterLines int) error {
 	rasterNumN1 := byte(r % 256)
 
 	// Media type
-	const mediaType = byte(0x00)
+	const mediaType = byte(0x0A)
+	enableFlag |= printPropertyEnableBitMedia
 
 	const page = byte(0x00) // firstPage: 0, otherPage: 1
 
@@ -377,10 +389,9 @@ func (s Serial) SetPrintMode(autocut, mirror bool) error {
 	if autocut {
 		v = setBit(v, 6)
 	}
-	if mirror {
-		v = setBit(v, 7)
-	}
-
+	// if mirror {
+	// 	v = setBit(v, 7)
+	// }
 	payload := append(cmdSetPrintModePrefix, byte(v))
 	if s.Debug {
 		log.Println("SetPrintMode", hex.EncodeToString(payload))
@@ -390,26 +401,20 @@ func (s Serial) SetPrintMode(autocut, mirror bool) error {
 	return err
 }
 
-func (s Serial) SetExtendedMode(pt750halfcut bool, noChainprint bool, specialTapeDisableCut bool, highDPI bool, noClearBuffer bool) error {
+func (s Serial) SetExtendedMode(twoColorPrinting, cutAtEnd, highDefinitionPrinting bool) error {
 	var v int
-	if pt750halfcut {
-		v = setBit(v, 2)
+
+	// 2色ロールならtrue, 単色ロールならfalseで
+	if twoColorPrinting {
+		v = setBit(v, 0)
 	}
 
-	if noChainprint {
+	if cutAtEnd {
 		v = setBit(v, 3)
 	}
 
-	if specialTapeDisableCut {
-		v = setBit(v, 4)
-	}
-
-	if highDPI {
+	if highDefinitionPrinting {
 		v = setBit(v, 6)
-	}
-
-	if noClearBuffer {
-		v = setBit(v, 7)
 	}
 
 	payload := append(cmdSetExtendedModePrefix, byte(v))
@@ -502,7 +507,7 @@ func LoadPNGImage(r io.Reader, tapeWidth TapeWidth) ([]byte, int, error) {
 }
 
 func LoadRawImage(p image.Image, tapeWidth TapeWidth) ([]byte, int, error) {
-	ws := 128
+	ws := 720
 	var canvas image.Image
 
 	size := p.Bounds().Size()
@@ -554,12 +559,17 @@ func CompressImage(data []byte, bytesWidth int) ([]byte, error) {
 
 		length := len(packed)
 
+		fmt.Println(length)
+		// fmt.Println(bytesWidth)
+
 		dataBuf.Write(cmdRasterTransfer)
 		dataBuf.Write([]byte{
-			byte(uint(length % 256)),
-			byte(uint(length / 256)),
+			// byte(uint(length % 256)),
+			// byte(uint(length / 256)),
+			byte(0x02),
+			byte(uint(bytesWidth)),
 		})
-		dataBuf.Write(packed)
+		dataBuf.Write(chunk)
 	}
 
 	return dataBuf.Bytes(), nil

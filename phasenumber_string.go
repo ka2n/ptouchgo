@@ -4,6 +4,16 @@ package ptouchgo
 
 import "strconv"
 
+func _() {
+	// An "invalid array index" compiler error signifies that the constant values have changed.
+	// Re-run the stringer command to generate them again.
+	var x [1]struct{}
+	_ = x[phaseNumberEdit-0]
+	_ = x[phaseNumberEditFeed-1]
+	_ = x[phaseNumberNormal-0]
+	_ = x[phaseNumberNormalCoverOpen-20]
+}
+
 const (
 	_PhaseNumber_name_0 = "EditEditFeed"
 	_PhaseNumber_name_1 = "NormalCoverOpen"

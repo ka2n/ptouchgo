@@ -4,6 +4,15 @@ package ptouchgo
 
 import "strconv"
 
+func _() {
+	// An "invalid array index" compiler error signifies that the constant values have changed.
+	// Re-run the stringer command to generate them again.
+	var x [1]struct{}
+	_ = x[notificationInvalid-0]
+	_ = x[notificationCoverOpen-1]
+	_ = x[notificationCoverClose-2]
+}
+
 const _Notification_name = "InvalidCoverOpenCoverClose"
 
 var _Notification_index = [...]uint8{0, 7, 16, 26}

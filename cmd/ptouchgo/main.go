@@ -42,7 +42,7 @@ func mainCLI() error {
 
 	tw := ptouchgo.TapeWidth(*tapeWidth)
 	if !tw.Valid() {
-		return fmt.Errorf("tapeWith only accespts 3.5,6,9,12,18,24")
+		return fmt.Errorf("tapeWith only accespts 3.5,6,9,12,18,24,62")
 	}
 
 	// prepare data
@@ -59,20 +59,21 @@ func mainCLI() error {
 	rasterLines := len(data) / bytesWidth
 
 	debug := *debugMode
-	if debug {
-		for i := 0; i < len(data); i += bytesWidth {
-			to := i + bytesWidth
-			if to > len(data) {
-				to = len(data)
-			}
-			chunk := data[i:to]
-			for _, c := range chunk {
-				fmt.Printf("%08b", c)
-			}
-			fmt.Println()
-		}
-	}
+	// if debug {
+	// 	for i := 0; i < len(data); i += bytesWidth {
+	// 		to := i + bytesWidth
+	// 		if to > len(data) {
+	// 			to = len(data)
+	// 		}
+	// 		chunk := data[i:to]
+	// 		for _, c := range chunk {
+	// 			fmt.Printf("%08b", c)
+	// 		}
+	// 		fmt.Println()
+	// 	}
+	// }
 
+	fmt.Println(bytesWidth)
 	// Compless data
 	packedData, err := ptouchgo.CompressImage(data, bytesWidth)
 	if err != nil {
@@ -111,7 +112,7 @@ func mainCLI() error {
 		return err
 	}
 
-	err = ser.SetExtendedMode(false, true, false, false, false)
+	err = ser.SetExtendedMode(true, true, false)
 	if err != nil {
 		return err
 	}
@@ -139,6 +140,13 @@ func mainCLI() error {
 			return err
 		}
 	}
+
+	status, err := ser.ReadStatus()
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("StatusType: ", status.StatusType)
 
 	ser.Reset()
 	return nil

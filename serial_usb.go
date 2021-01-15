@@ -14,6 +14,7 @@ const (
         productIDPTP700   = 0x2061
 	productIDPTP750W  = 0x2062
 	productIDPTP710BT = 0x20af
+	productQL820NWB = 0x209d
 )
 
 type USBSerial struct {
@@ -46,12 +47,18 @@ func OpenUSB() (io.ReadWriteCloser, error) {
 
         if dev == nil {
                 dev, _ = ctx.OpenDeviceWithVIDPID(brotherVendorID, productIDPTP710BT)
-        }
+				}
+				
+        if dev == nil {
+                dev, _ = ctx.OpenDeviceWithVIDPID(brotherVendorID, productQL820NWB)
+				}
 
 	if dev == nil {
 		err = fmt.Errorf("USB device not found")
 		goto handleError
 	}
+
+	fmt.Println(dev)
 
 	err = dev.SetAutoDetach(true)
 	if err != nil {

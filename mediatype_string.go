@@ -4,6 +4,17 @@ package ptouchgo
 
 import "strconv"
 
+func _() {
+	// An "invalid array index" compiler error signifies that the constant values have changed.
+	// Re-run the stringer command to generate them again.
+	var x [1]struct{}
+	_ = x[mediaTypeNone-0]
+	_ = x[mediaTypeLaminated-1]
+	_ = x[mediaTypeNonLaminated-3]
+	_ = x[mediaTypeHeatShirink-17]
+	_ = x[mediaTypeInvalid-255]
+}
+
 const (
 	_MediaType_name_0 = "No tapeLaminated"
 	_MediaType_name_1 = "Non laminated"

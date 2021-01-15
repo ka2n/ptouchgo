@@ -4,15 +4,29 @@ package ptouchgo
 
 import "strconv"
 
+func _() {
+	// An "invalid array index" compiler error signifies that the constant values have changed.
+	// Re-run the stringer command to generate them again.
+	var x [1]struct{}
+	_ = x[modelPTP700-103]
+	_ = x[modelPTP750W-104]
+	_ = x[modelPTP710BT-118]
+}
+
 const (
-	_Model_name_0 = "PT-P750W"
+	_Model_name_0 = "PT-P700PT-P750W"
 	_Model_name_1 = "PT-P710BT"
+)
+
+var (
+	_Model_index_0 = [...]uint8{0, 7, 15}
 )
 
 func (i Model) String() string {
 	switch {
-	case i == 104:
-		return _Model_name_0
+	case 103 <= i && i <= 104:
+		i -= 103
+		return _Model_name_0[_Model_index_0[i]:_Model_index_0[i+1]]
 	case i == 118:
 		return _Model_name_1
 	default:

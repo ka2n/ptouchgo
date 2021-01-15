@@ -4,6 +4,42 @@ package ptouchgo
 
 import "strconv"
 
+func _() {
+	// An "invalid array index" compiler error signifies that the constant values have changed.
+	// Re-run the stringer command to generate them again.
+	var x [1]struct{}
+	_ = x[tapeColorWhite-1]
+	_ = x[tapeColorOther-2]
+	_ = x[tapeColorClear-3]
+	_ = x[tapeColorRed-4]
+	_ = x[tapeColorBlue-5]
+	_ = x[tapeColorYellow-6]
+	_ = x[tapeColorGreen-7]
+	_ = x[tapeColorBlack-8]
+	_ = x[tapeColorClearWhiteText-9]
+	_ = x[tapeColorMatteWhite-32]
+	_ = x[tapeColorMatteClear-33]
+	_ = x[tapeColorMatteSilver-34]
+	_ = x[tapeColorSatinGold-35]
+	_ = x[tapeColorSatinSilver-36]
+	_ = x[tapeColorDBlue-48]
+	_ = x[tapeColorDRed-49]
+	_ = x[tapeColorFluorescentOrange-64]
+	_ = x[tapeColorFluorescentyellow-65]
+	_ = x[tapeColorBerryPink-80]
+	_ = x[tapeColorLightGray-81]
+	_ = x[tapeColorLimeGreen-82]
+	_ = x[tapeColorFYellow-96]
+	_ = x[tapeColorFPing-97]
+	_ = x[tapeColorFBlue-98]
+	_ = x[tapeColorHeatShrinkWhite-112]
+	_ = x[tapeColorFlexWhite-144]
+	_ = x[tapeColorFlexYellow-145]
+	_ = x[tapeColorCleaning-240]
+	_ = x[tapeColorStencil-241]
+	_ = x[tapeColorInvalid-255]
+}
+
 const (
 	_TapeColor_name_0 = "WhiteOtherClearRedBlueYellowGreenBlackClearWhiteText"
 	_TapeColor_name_1 = "MatteWhiteMatteClearMatteSilverSatinGoldSatinSilver"

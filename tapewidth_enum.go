@@ -18,6 +18,8 @@ func (i TapeWidth) Valid() bool {
 		return true
 	case i == 24:
 		return true
+	case i == 62:
+		return true
 	default:
 		return false
 	}

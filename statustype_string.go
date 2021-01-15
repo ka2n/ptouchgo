@@ -4,6 +4,19 @@ package ptouchgo
 
 import "strconv"
 
+func _() {
+	// An "invalid array index" compiler error signifies that the constant values have changed.
+	// Re-run the stringer command to generate them again.
+	var x [1]struct{}
+	_ = x[statusTypeReply-0]
+	_ = x[statusTypePrintingCompleted-1]
+	_ = x[statusTypeErrorOccured-2]
+	_ = x[statusTypeIFModeFinished-3]
+	_ = x[statusTypePowerOff-4]
+	_ = x[statusTypeNotification-5]
+	_ = x[statusTypePhaseChange-6]
+}
+
 const _StatusType_name = "ReplyPrinting completedError occuredIFModeFinished(unused)Power offNotificationPhase change"
 
 var _StatusType_index = [...]uint8{0, 5, 23, 36, 58, 67, 79, 91}

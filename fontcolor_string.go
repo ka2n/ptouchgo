@@ -4,6 +4,22 @@ package ptouchgo
 
 import "strconv"
 
+func _() {
+	// An "invalid array index" compiler error signifies that the constant values have changed.
+	// Re-run the stringer command to generate them again.
+	var x [1]struct{}
+	_ = x[fontColorWhite-1]
+	_ = x[fontColorRed-4]
+	_ = x[fontColorBlue-5]
+	_ = x[fontColorBlack-8]
+	_ = x[fontColorGold-10]
+	_ = x[fontColorFBlue-98]
+	_ = x[fontColorCleaning-240]
+	_ = x[fontColorStencil-241]
+	_ = x[fontColorOther-2]
+	_ = x[fontColorInvalid-255]
+}
+
 const (
 	_FontColor_name_0 = "WhiteOther"
 	_FontColor_name_1 = "RedBlue"
