@@ -7,12 +7,12 @@ import (
 	"os"
 
 	"github.com/ka2n/ptouchgo"
-	"github.com/pkg/errors"
+	_ "github.com/ka2n/ptouchgo/conn/usb"
 )
 
 var (
 	imagePath  = flag.String("i", "", "Image path")
-	devicePath = flag.String("d", "/dev/rfcomm0", "Device path(RFCOMM or \"usb\")")
+	devicePath = flag.String("d", "/dev/rfcomm0", `Device path(RFCOMM device path or "usb" or "usb://0x0000" or "tcp://192.168.100.1:9100")`)
 	tapeWidth  = flag.Uint("t", 24, "Tape width")
 	debugMode  = flag.Bool("debug", false, "Debug decoded image")
 	dryRunMode = flag.Bool("dry", false, "not printing")
@@ -54,7 +54,7 @@ func mainCLI() error {
 
 	data, bytesWidth, err := ptouchgo.LoadPNGImage(imgFile, tw)
 	if err != nil {
-		return errors.Wrap(err, "load image")
+		return fmt.Errorf("load image: %w", err)
 	}
 	rasterLines := len(data) / bytesWidth
 
@@ -76,7 +76,7 @@ func mainCLI() error {
 	// Compless data
 	packedData, err := ptouchgo.CompressImage(data, bytesWidth)
 	if err != nil {
-		return errors.Wrap(err, "convert image")
+		return fmt.Errorf("convert image: %w", err)
 	}
 
 	if debug {
@@ -86,7 +86,7 @@ func mainCLI() error {
 	// Open printer
 	ser, err = ptouchgo.Open(*devicePath, *tapeWidth, debug)
 	if err != nil {
-		return errors.Wrap(err, *devicePath)
+		return fmt.Errorf("%s, %w", *devicePath, err)
 	}
 	defer ser.Close()
 
