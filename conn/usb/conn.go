@@ -1,17 +1,21 @@
-package ptouchgo
+package usb
 
 import (
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/google/gousb"
+	"github.com/ka2n/ptouchgo/conn"
 	"github.com/pkg/errors"
 )
 
 const (
 	brotherVendorID   = 0x04f9
-        productIDPTP700   = 0x2061
+	productIDPTP700   = 0x2061
 	productIDPTP750W  = 0x2062
 	productIDPTP710BT = 0x20af
 )
@@ -27,7 +31,13 @@ type USBSerial struct {
 	done   func()
 }
 
-func OpenUSB() (io.ReadWriteCloser, error) {
+func init() {
+	conn.Register("usb", conn.DriverFunc(OpenUSB))
+}
+
+// OpenUSB open usb connection to device. if address is empty string, it will find pre defined device id.
+// address should formatted like "20af" or empty string.
+func OpenUSB(address string) (io.ReadWriteCloser, error) {
 	var err error
 	var ctx *gousb.Context
 	var done func()
@@ -39,14 +49,29 @@ func OpenUSB() (io.ReadWriteCloser, error) {
 	ctx = gousb.NewContext()
 	ctx.Debug(10)
 
-	dev, _ = ctx.OpenDeviceWithVIDPID(brotherVendorID, productIDPTP750W)
-	if dev == nil {
-		dev, _ = ctx.OpenDeviceWithVIDPID(brotherVendorID, productIDPTP700)
-	}
+	if address != "" {
+		if !strings.HasPrefix(address, "0x") {
+			err = fmt.Errorf("invalid device address. address should \"0x0000\" form")
+			goto handleError
+		}
+		productID, err := hex.DecodeString(address[2:])
+		if err != nil {
+			goto handleError
+		}
+		dev, err = ctx.OpenDeviceWithVIDPID(brotherVendorID, gousb.ID(binary.BigEndian.Uint16(productID)))
+		if err != nil {
+			goto handleError
+		}
+	} else {
+		dev, _ = ctx.OpenDeviceWithVIDPID(brotherVendorID, productIDPTP750W)
+		if dev == nil {
+			dev, _ = ctx.OpenDeviceWithVIDPID(brotherVendorID, productIDPTP700)
+		}
 
-        if dev == nil {
-                dev, _ = ctx.OpenDeviceWithVIDPID(brotherVendorID, productIDPTP710BT)
-        }
+		if dev == nil {
+			dev, _ = ctx.OpenDeviceWithVIDPID(brotherVendorID, productIDPTP710BT)
+		}
+	}
 
 	if dev == nil {
 		err = fmt.Errorf("USB device not found")

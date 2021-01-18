@@ -9,8 +9,10 @@ import (
 	"image/png"
 	"io"
 	"log"
+	"net/url"
 
 	"github.com/disintegration/imaging"
+	"github.com/ka2n/ptouchgo/conn"
 )
 
 const (
@@ -54,7 +56,7 @@ type Status struct {
 type Model int
 
 const (
-        modelPTP700   Model = 0x67 // PT-P700
+	modelPTP700   Model = 0x67 // PT-P700
 	modelPTP750W  Model = 0x68 // PT-P750W
 	modelPTP710BT Model = 0x76 // PT-P710BT
 )
@@ -237,22 +239,40 @@ type Serial struct {
 	Debug       bool
 }
 
+// Open connection, address should be a device path string like "/dev/rfcomm0", "usb" or "usb://0x7c35" or "tcp://192.168.100.1:9100")
 func Open(address string, TapeWidthMM uint, debug bool) (Serial, error) {
 	var ser io.ReadWriteCloser
 	var err error
 	if address == "usb" {
 		if debug {
-			log.Println("Select USB driver")
+			log.Println("Select USB driver with automatic device selection")
 		}
-		ser, err = OpenUSB()
+		ser, err = conn.Open("usb", "")
+		if err != nil {
+			return Serial{}, err
+		}
 	} else {
-		if debug {
-			log.Println("Select Bluetooth driver")
+		var driver string
+		var addr string
+		u, err := url.Parse(address)
+		if err != nil {
+			return Serial{}, err
 		}
-		ser, err = OpenBluetooth(address)
-	}
-	if err != nil {
-		return Serial{}, err
+		if u.Scheme == "" {
+			driver = "serial"
+			addr = u.Path
+		} else {
+			driver = u.Scheme
+			addr = u.Host
+		}
+		if debug {
+			log.Printf("Select %s driver, address: %s\n", driver, addr)
+		}
+
+		ser, err = conn.Open(driver, addr)
+		if err != nil {
+			return Serial{}, err
+		}
 	}
 	return Serial{Conn: ser, TapeWidthMM: TapeWidthMM, Debug: debug}, err
 }

@@ -7,12 +7,13 @@ import (
 	"os"
 
 	"github.com/ka2n/ptouchgo"
+	_ "github.com/ka2n/ptouchgo/conn/usb"
 	"github.com/pkg/errors"
 )
 
 var (
 	imagePath  = flag.String("i", "", "Image path")
-	devicePath = flag.String("d", "/dev/rfcomm0", "Device path(RFCOMM or \"usb\")")
+	devicePath = flag.String("d", "/dev/rfcomm0", `Device path(RFCOMM device path or "usb" or "usb://0x0000" or "tcp://192.168.100.1:9100")`)
 	tapeWidth  = flag.Uint("t", 24, "Tape width")
 	debugMode  = flag.Bool("debug", false, "Debug decoded image")
 	dryRunMode = flag.Bool("dry", false, "not printing")
