@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/gousb"
 	"github.com/ka2n/ptouchgo/conn"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -80,25 +79,25 @@ func OpenUSB(address string) (io.ReadWriteCloser, error) {
 
 	err = dev.SetAutoDetach(true)
 	if err != nil {
-		err = errors.Wrap(err, "set auto detach kernel driver")
+		err = fmt.Errorf("set auto detach kernel driver: %w", err)
 		goto handleError
 	}
 
 	usbif, done, err = dev.DefaultInterface()
 	if err != nil {
-		err = errors.Wrap(err, "get default interface")
+		err = fmt.Errorf("get default interface: %w", err)
 		goto handleError
 	}
 
 	input, err = usbif.InEndpoint(0x81)
 	if err != nil {
-		err = errors.Wrap(err, "open InEndpoint")
+		err = fmt.Errorf("open InEndpoint: %w", err)
 		goto handleError
 	}
 
 	output, err = usbif.OutEndpoint(0x02)
 	if err != nil {
-		err = errors.Wrap(err, "open OutEndpoint")
+		err = fmt.Errorf("open OutEndpoint: %w", err)
 		goto handleError
 	}
 

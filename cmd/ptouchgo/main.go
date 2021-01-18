@@ -8,7 +8,6 @@ import (
 
 	"github.com/ka2n/ptouchgo"
 	_ "github.com/ka2n/ptouchgo/conn/usb"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -55,7 +54,7 @@ func mainCLI() error {
 
 	data, bytesWidth, err := ptouchgo.LoadPNGImage(imgFile, tw)
 	if err != nil {
-		return errors.Wrap(err, "load image")
+		return fmt.Errorf("load image: %w", err)
 	}
 	rasterLines := len(data) / bytesWidth
 
@@ -77,7 +76,7 @@ func mainCLI() error {
 	// Compless data
 	packedData, err := ptouchgo.CompressImage(data, bytesWidth)
 	if err != nil {
-		return errors.Wrap(err, "convert image")
+		return fmt.Errorf("convert image: %w", err)
 	}
 
 	if debug {
@@ -87,7 +86,7 @@ func mainCLI() error {
 	// Open printer
 	ser, err = ptouchgo.Open(*devicePath, *tapeWidth, debug)
 	if err != nil {
-		return errors.Wrap(err, *devicePath)
+		return fmt.Errorf("%s, %w", *devicePath, err)
 	}
 	defer ser.Close()
 
