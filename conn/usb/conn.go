@@ -53,7 +53,9 @@ func OpenUSB(address string) (io.ReadWriteCloser, error) {
 			err = fmt.Errorf("invalid device address. address should \"0x0000\" form")
 			goto handleError
 		}
-		productID, err := hex.DecodeString(address[2:])
+
+		var productID []byte
+		productID, err = hex.DecodeString(address[2:])
 		if err != nil {
 			goto handleError
 		}
